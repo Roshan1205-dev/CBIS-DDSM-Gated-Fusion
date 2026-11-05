@@ -1,0 +1,7 @@
+{
+  "test_roc_auc": 0.8255705675199784,
+  "test_pr_auc": 0.7279693853624669,
+  "test_rows": 704,
+  "test_patients": 349,
+  "threshold": 0.5
+}
