@@ -1,0 +1,8 @@
+Flask>=3.0
+tensorflow>=2.15
+numpy
+pandas
+joblib
+scikit-learn
+scipy
+Pillow

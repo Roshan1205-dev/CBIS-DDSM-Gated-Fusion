@@ -1,0 +1,81 @@
+# Dataset and experiment artifacts
+csv/
+jpeg/
+gated_fusion_outputs/
+image_only_outputs/
+
+# Model files
+*.keras
+*.h5
+*.weights
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db# Dataset and experiment artifacts
+csv/
+jpeg/
+gated_fusion_outputs/
+image_only_outputs/
+
+# Model files
+*.keras
+*.h5
+*.weights
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Secrets
+.env
+.env.*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db# Dataset
+csv/
+jpeg/
+*.dcm
+*.dicom
+
+# Model checkpoints
+*.h5
+*.keras
+*.weights
+*.ckpt
+
+# Experiment outputs
+gated_fusion_outputs/
+image_only_outputs/
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+

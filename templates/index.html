@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CBIS-DDSM · Model Validation</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brandmark">M</div>
+  <div><div class="eyebrow">RESEARCH WORKSPACE</div><h1>CBIS-DDSM <span>Model Validation</span></h1></div>
+  <div class="status {{ 'ready' if model_ready else 'not-ready' }}"><i></i>{{ 'Model loaded' if model_ready else 'Model not loaded' }}</div>
+</header>
+<main>
+  <section class="intro">
+    <div><p class="eyebrow">MAMMOGRAPHY · MULTIMODAL CLASSIFICATION</p><h2>Validation overview</h2><p class="muted">Gated-fusion model · EfficientNetB0 + clinical metadata · held-out test set</p></div>
+    <div class="threshold-chip">Decision threshold <strong>{{ '%.2f'|format(metrics.get('threshold', 0.5)|float) }}</strong></div>
+  </section>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for category, message in messages %}<div class="alert {{ category }}">{{ message }}</div>{% endfor %}{% endif %}
+  {% endwith %}
+  {% if startup_error %}<div class="alert error"><strong>Artifact loading issue:</strong> {{ startup_error }}<br>Check the folder paths in <code>app.py</code> and run it from the same TensorFlow environment used for training.</div>{% endif %}
+
+  <section class="metric-grid">
+    <article class="metric-card"><span>Test ROC-AUC</span><strong>{{ '%.4f'|format(metrics.get('test_roc_auc', 0)|float) }}</strong><small>Ranking performance</small></article>
+    <article class="metric-card"><span>Test PR-AUC / AP</span><strong>{{ '%.4f'|format(metrics.get('test_pr_auc', 0)|float) }}</strong><small>Precision–recall summary</small></article>
+    <article class="metric-card"><span>Accuracy</span><strong>{% if metrics.get('accuracy_calculated') is not none %}{{ '%.1f%%'|format(metrics.get('accuracy_calculated', 0)*100) }}{% else %}—{% endif %}</strong><small>{{ metrics.get('correct', '—') }} correct / {{ metrics.get('test_rows', '—') }} crops</small></article>
+    <article class="metric-card"><span>Test set</span><strong>{{ metrics.get('test_rows', '—') }}</strong><small>{{ metrics.get('test_patients', '—') }} distinct patients</small></article>
+  </section>
+
+  <section class="two-col">
+    <article class="panel">
+      <div class="panel-heading"><div><p class="eyebrow">ERROR ANALYSIS</p><h3>Confusion matrix</h3></div><span class="mini-label">Threshold 0.50</span></div>
+      {% if metrics.get('tn') is not none %}
+      <div class="matrix">
+        <div class="matrix-axis"></div><div class="matrix-axis">Predicted benign</div><div class="matrix-axis">Predicted malignant</div>
+        <div class="matrix-label">Actual benign</div><div class="matrix-cell tn"><strong>{{ metrics.tn }}</strong><span>True benign</span></div><div class="matrix-cell fp"><strong>{{ metrics.fp }}</strong><span>False positive</span></div>
+        <div class="matrix-label">Actual malignant</div><div class="matrix-cell fn"><strong>{{ metrics.fn }}</strong><span>False negative</span></div><div class="matrix-cell tp"><strong>{{ metrics.tp }}</strong><span>True malignant</span></div>
+      </div>
+      <div class="mini-metrics">
+        <div><span>Malignant recall</span><b>{{ '%.1f%%'|format(metrics.get('malignant_recall',0)*100) }}</b></div>
+        <div><span>Malignant precision</span><b>{{ '%.1f%%'|format(metrics.get('malignant_precision',0)*100) }}</b></div>
+        <div><span>Benign recall / specificity</span><b>{{ '%.1f%%'|format(metrics.get('benign_recall',0)*100) }}</b></div>
+      </div>
+      {% else %}<p class="muted">Add test_predictions.csv to populate the confusion matrix.</p>{% endif %}
+    </article>
+    <article class="panel">
+      <div class="panel-heading"><div><p class="eyebrow">MODEL COMPARISON</p><h3>Image-only baseline</h3></div></div>
+      <p class="muted">Metrics shown from the saved image-only test_metrics.json, if present.</p>
+      <div class="compare-row"><span>Gated fusion ROC-AUC</span><b>{{ '%.4f'|format(metrics.get('test_roc_auc',0)|float) }}</b></div>
+      <div class="bar-track"><div class="bar-fill" style="width:{{ [metrics.get('test_roc_auc',0)|float*100,100]|min }}%"></div></div>
+      <div class="compare-row"><span>Image-only ROC-AUC</span><b>{% if baseline.get('test_roc_auc') is not none %}{{ '%.4f'|format(baseline.get('test_roc_auc')|float) }}{% else %}Add baseline JSON{% endif %}</b></div>
+      {% if baseline.get('test_roc_auc') is not none %}<div class="bar-track"><div class="bar-fill secondary" style="width:{{ [baseline.get('test_roc_auc',0)|float*100,100]|min }}%"></div></div>{% endif %}
+      <div class="compare-row"><span>Gated fusion PR-AUC</span><b>{{ '%.4f'|format(metrics.get('test_pr_auc',0)|float) }}</b></div>
+      <div class="compare-row"><span>Image-only PR-AUC</span><b>{% if baseline.get('test_pr_auc') is not none %}{{ '%.4f'|format(baseline.get('test_pr_auc')|float) }}{% else %}—{% endif %}</b></div>
+      <p class="footnote">Only compare results when both models used the same test rows and labels.</p>
+    </article>
+  </section>
+
+  <section class="panel prediction-panel" id="predict">
+    <div class="panel-heading"><div><p class="eyebrow">LOCAL INFERENCE</p><h3>Test a mammography crop</h3><p class="muted">Upload a crop and enter the metadata fields used by the trained model.</p></div><span class="mini-label">Image + metadata</span></div>
+    {% if prediction_result %}
+      <div class="result {{ 'malignant' if prediction_result.label == 'Malignant' else 'benign' }}">
+        <div><span class="eyebrow">MODEL OUTPUT · RESEARCH ONLY</span><h4>{{ prediction_result.label }}</h4><p>Predicted malignancy probability: <strong>{{ '%.1f%%'|format(prediction_result.probability*100) }}</strong></p></div>
+        <div class="probability"><div class="probability-track"><div style="width:{{ prediction_result.probability*100 }}%"></div></div><small>Threshold {{ '%.2f'|format(prediction_result.threshold) }}</small></div>
+      </div>
+    {% endif %}
+    <form action="{{ url_for('predict') }}" method="post" enctype="multipart/form-data" class="predict-form">
+      <label class="upload-field">Mammography crop (JPEG/PNG)<input type="file" name="image" accept=".jpg,.jpeg,.png,image/jpeg,image/png" required></label>
+      <div class="form-grid">
+        {% for col in categorical_cols %}
+        <label>{{ col|title }}<input type="text" name="{{ col }}" placeholder="Leave blank if unknown" value="{{ (form_values or {}).get(col, '') if form_values else '' }}"></label>
+        {% endfor %}
+        <label>Subtlety (1–5, if known)<input type="number" min="1" max="5" step="1" name="subtlety" placeholder="Leave blank if unknown" value="{{ (form_values or {}).get('subtlety', '') if form_values else '' }}"></label>
+      </div>
+      <button type="submit" {% if not model_ready %}disabled{% endif %}>Run local prediction <span>→</span></button>
+      <p class="footnote">Do not enter patient identifiers. This demo is not a medical device and must not be used to make clinical decisions.</p>
+    </form>
+  </section>
+
+  <section class="panel" id="explorer">
+    <div class="panel-heading"><div><p class="eyebrow">HELD-OUT TEST DATA</p><h3>Prediction explorer</h3><p class="muted">Browse saved test predictions and identify misclassified crops.</p></div><span class="mini-label">{{ prediction_count }} rows</span></div>
+    <div class="filters">
+      <input id="search" type="search" placeholder="Search patient ID or pathology…">
+      <select id="actualFilter"><option value="">All actual labels</option><option>Benign</option><option>Malignant</option></select>
+      <select id="resultFilter"><option value="">Correct + incorrect</option><option value="correct">Correct only</option><option value="incorrect">Incorrect only</option></select>
+    </div>
+    <div class="table-wrap"><table id="predTable"><thead><tr><th>Patient ID</th><th>Pathology</th><th>Actual</th><th>Predicted</th><th>Malignant probability</th><th>Result</th></tr></thead><tbody>
+      {% for row in predictions %}
+      <tr data-patient="{{ row.patient_id }}" data-pathology="{{ row.pathology }}" data-actual="{{ row.actual }}" data-correct="{{ 'correct' if row.correct else 'incorrect' }}">
+        <td class="mono">{{ row.patient_id }}</td><td>{{ row.pathology }}</td><td>{{ row.actual }}</td><td>{{ row.predicted }}</td><td><div class="prob-cell"><div class="bar-track"><div class="bar-fill" style="width:{{ row.probability_pct }}%"></div></div><span>{{ row.probability_pct }}%</span></div></td>
+        <td><span class="tag {{ 'good' if row.correct else 'bad' }}">{{ 'Correct' if row.correct else 'Incorrect' }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody></table></div>
+    <p class="footnote" id="tableCount">Showing {{ predictions|length }} rows. Patient IDs are repeated when a patient has multiple crops.</p>
+  </section>
+  <footer><span>CBIS-DDSM research prototype</span><span>Runs locally · 127.0.0.1:5000</span></footer>
+</main>
+<script>
+const search = document.getElementById('search');
+const actual = document.getElementById('actualFilter');
+const result = document.getElementById('resultFilter');
+const rows = Array.from(document.querySelectorAll('#predTable tbody tr'));
+function filterRows() {
+  const q = (search.value || '').toLowerCase();
+  let shown = 0;
+  rows.forEach(row => {
+    const text = (row.dataset.patient + ' ' + row.dataset.pathology).toLowerCase();
+    const ok = text.includes(q) && (!actual.value || row.dataset.actual === actual.value) && (!result.value || row.dataset.correct === result.value);
+    row.hidden = !ok;
+    if (ok) shown++;
+  });
+  document.getElementById('tableCount').textContent = `Showing ${shown} of ${rows.length} rows. Patient IDs can repeat across multiple crops.`;
+}
+[search, actual, result].forEach(el => el.addEventListener('input', filterRows));
+</script>
+</body>
+</html>
